@@ -1,0 +1,65 @@
+library(tidytuesdayR)
+
+
+tuesdata <- tidytuesdayR::tt_load('2020-11-03')
+ikea <- tuesdata$ikea
+
+ikea %>%
+  group_by(designer, category) %>%
+  tally()
+
+
+ungroup(ikea)
+median(str_length(ikea$designer))
+
+
+
+ikea %>%
+  mutate(ikea, design_char = str_length(designer)) %>%
+  filter(design_char < 20) %>%
+  group_by(designer) %>%
+  summarise(av_price = mean(price)) %>%
+  ggplot(mapping = aes(x = designer, y = av_price)) +
+  geom_point()
+
+ikea %>%
+  mutate(ikea, design_char = str_length(designer)) %>%    ## adds column with number of characters in designer name
+  filter(design_char < 50) %>%                            ## filters out names that include product descriptions (many characters)
+  group_by(designer) %>%
+  summarise(designs = n_distinct(item_id), av_price = mean(price)) %>%  ## summarise number of unique items and average price by designer
+  filter(designs > 10, designs < 600) %>%                 ## filter out designers with v low and v high numbers of designs
+  ggplot() +
+        geom_point(mapping = aes(x = designer, y = av_price, size = designs)) +
+        coord_flip()
+
+ikea %>%
+  mutate(ikea, design_char = str_length(designer)) %>%
+  filter(design_char < 50) %>%
+  group_by(designer) %>%
+  summarise(designs = n_distinct(item_id), av_price = mean(price)) %>%
+  filter(designs > 10, designs < 600) %>%           ## filter out designers with v low and v high numbers of designs
+  separate(designer, c("A", "B"), sep = "(/)") %>%  ##separate designers into two columns determined by '/'
+  group_by(A, B) %>%    
+  ggplot() +
+  geom_point(mapping = aes(x = A, y = av_price, size = designs)) +   ##plot only the first column for unique values
+  coord_flip()
+
+
+### taken from github - separating designers by gender
+ 
+ikea %>% 
+  mutate(n_designers = str_count(designer, "/") + 1L,
+         .keep = "used") %>% 
+  arrange(-n_designers)
+  
+ikea_designers <- ikea %>% 
+  separate(designer, into = paste0("designer", 1:7), sep = "/", fill = "right") %>% ## separates designers and gives them a number 1-7 in columns
+  pivot_longer(starts_with("designer"),
+               names_to = "designer_no", values_to = "designer") %>%      ##switches designer number columns to rows and drops NA values
+  drop_na(designer) %>% 
+  mutate(designer_first_name = str_extract(designer, "^\\p{Lu}\\p{Ll}+")) ## creates new column of designer first name, starting from the beginning of the line (^), extracts a string of uppercase and lowercase characters (\\p{Lu}\\p{Ll}), repeated more than once (+), this eliminates initials and last names
+
+designer_names <- ikea_designers %>% 
+  drop_na(designer_first_name) %>% 
+  pull(designer_first_name) %>% 
+  unique()
