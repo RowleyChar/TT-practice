@@ -1,0 +1,125 @@
+library(tidyverse)
+library(tidytuesdayR)
+
+tuesdata <- tidytuesdayR::tt_load('2020-11-10')
+
+View(tuesdata)
+mobile <- tuesdata$mobile
+landline <- tuesdata$landline
+
+mobile <- tuesdata$mobile %>% 
+  rename(subs = mobile_subs) %>%
+  mutate(type = "mobile")
+
+landline <- tuesdata$landline %>% 
+  rename(subs = landline_subs) %>%
+  mutate(type = "landline")
+
+phones <- bind_rows(mobile, landline)
+
+phones %>% count(entity)
+
+phones %>% filter(entity == c("United Kingdom", "France", "Germany")) %>%
+  ggplot() +
+  geom_line(aes( x = year, y = subs, colour = type)) +
+  facet_wrap(vars(entity))
+
+phones %>%
+  ggplot() +
+  geom_line(aes(year, subs, colour = type, group = interaction(entity, type))) ## interaction combines type values for each country and plots separately
+
+phones %>% 
+  group_by(continent, year, type) %>% 
+  summarise(mean = mean(subs, na.rm = TRUE)) %>%
+  ggplot() +
+  geom_line(aes( x = year, y = mean, colour = type)) +
+  facet_wrap(vars(continent))
+
+
+phones %>% 
+  filter(!is.na(subs)) %>%
+  group_by(continent, year, type) %>% 
+  summarise(mean = mean(subs),
+            q25 = quantile(subs, 0.25),
+            q75 = quantile(subs, 0.75)) %>%
+  ggplot(aes( x = year, y = mean, colour = type)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.25 ) +
+  facet_wrap(vars(continent)) +
+  labs( x = "Year", 
+        y = "Average subscriptions per person", 
+        title = "Differences in landline and mobile adoption between continents",
+        subtitle = "Shaded areas show the 25th-75th percentile range")
+
+phones %>% 
+  mutate(subs_per_cap = subs/100) %>%
+  filter(entity == "United Kingdom") %>%
+  ggplot() +
+  geom_point( aes(gdp_per_cap, subs_per_cap, colour = type))
+
+
+phones %>%
+  filter(entity == "United Kingdom") %>%
+  ggplot() +
+  geom_line( aes(year, gdp_per_cap))
+
+MX_phones <- phones %>%
+  group_by(entity) %>% 
+  summarise(max_subs = max(subs, na.rm = TRUE))
+
+MX_gdp <- phones %>%
+  group_by(entity) %>%
+  summarise(max_gdp = max(gdp_per_cap, na.rm = TRUE)) 
+
+MX_phones %>% 
+  inner_join(MX_gdp, by = "entity") %>%
+  filter(max_gdp != "-Inf") %>%
+  ggplot() +
+  geom_point(aes(max_gdp, max_subs))
+
+MX_phones %>% 
+  inner_join(MX_gdp, by = "entity") %>%
+  filter(max_subs < 50) %>%
+  arrange(desc(max_gdp))
+
+  
+phones %>% filter(entity == c("Equatorial Guinea")) %>%
+  ggplot() +
+  geom_line(aes( x = year, y = subs, colour = type))
+
+
+### Using WDI package to distinguish economic status of countries
+
+library(WDI)
+
+country_incomes <- WDI(start = 2005, end = 2005, extra = TRUE) %>%
+  as.tibble() %>%
+  select(code = iso3c, income) %>%
+  filter(!is.na(income)) %>%
+  mutate(income = fct_relevel(income, "Low income", "Lower middle income", "Upper middle income"))
+
+## join together and use same graph code from before, but separating by income group rather than continent
+
+phones %>% inner_join(country_incomes, by = "code") %>%
+  filter(!is.na(subs)) %>%
+  group_by(income, year, type) %>% 
+  summarise(mean = mean(subs),
+            q25 = quantile(subs, 0.25),
+            q75 = quantile(subs, 0.75)) %>%
+  ggplot(aes( x = year, y = mean, colour = type)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = q25, ymax = q75), alpha = 0.25 ) +
+  facet_wrap(vars(income)) +
+  labs( x = "Year", 
+        y = "Average subscriptions per person", 
+        title = "Differences in landline and mobile adoption between income groups",
+        subtitle = "Shaded areas show the 25th-75th percentile range")
+
+
+phones %>% inner_join(country_incomes, by = "code") %>%
+  filter(!is.na(subs)) %>%
+  group_by(income, year, type) %>%
+  summarise(mean = mean(subs)) %>%
+  ggplot(aes(year, mean)) +
+  geom_line(aes(colour = income)) +
+  facet_wrap(~ type)
