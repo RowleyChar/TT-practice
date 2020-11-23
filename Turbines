@@ -1,0 +1,141 @@
+library(tidytuesdayR)
+library(tidyverse)
+library(stringr)
+
+tuesdata <- tidytuesdayR::tt_load('2020-10-27')
+wind_turbine <- tuesdata$`wind-turbine`
+
+as_tibble(wind_turbine)
+view(wind_turbine)
+
+wind_turbine %>% 
+  filter(str_length(commissioning_date) == 4) %>%
+  group_by(project_name) %>%
+  ggplot(aes(commissioning_date, turbine_rated_capacity_k_w, colour = model)) +
+  geom_point() +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 90))
+  
+model_date <- wind_turbine %>%
+  group_by(model) %>%
+  filter(str_length(commissioning_date) == 4, commissioning_date == min(commissioning_date)) %>%
+  slice(1) %>%
+  arrange(commissioning_date) 
+view(model_date)
+
+## how does turbine capacity relate to when model was first commissioned?
+
+wind_turbine %>%
+  group_by(model) %>%
+  filter(str_length(commissioning_date) == 4, commissioning_date == min(commissioning_date)) %>%
+  slice(1) %>%
+  arrange(commissioning_date) %>%
+  ggplot(aes(commissioning_date, turbine_rated_capacity_k_w, size = turbine_number_in_project)) +
+  geom_point() +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 90))
+
+
+library(maps)
+Canada <- map_data("world", region = "Canada")
+
+## turbine capacity map
+
+ggplot(Canada, aes(x = long, y = lat, group = group)) +
+  geom_polygon(fill="white", colour = "grey") +
+  geom_point(data = wind_turbine, aes(x = longitude, y = latitude, group = FALSE, colour = total_project_capacity_mw))
+
+  
+wind_turbine2 <- wind_turbine %>%
+  group_by(project_name) %>%
+  slice(1)
+
+ggplot(Canada, aes(x = long, y = lat, group = group)) +
+  geom_polygon(fill="white", colour = "grey") +
+  geom_point(data = wind_turbine2, aes(x = longitude, y = latitude, group = FALSE, colour = total_project_capacity_mw))
+
+
+
+wind_turbine3 <- wind_turbine2 %>%
+  filter(str_length(commissioning_date) == 4) %>%
+  mutate(commissioning_date = as.numeric(commissioning_date)) %>%
+  arrange(desc(commissioning_date)) %>%
+  mutate(decade = cut_width(commissioning_date, width = 25)) 
+
+## turbine comissioning date map
+
+ggplot(Canada, aes(x = long, y = lat, group = group)) +
+  geom_polygon(fill="white", colour = "grey") +
+  geom_point(data = wind_turbine3, aes(x = longitude, y = latitude, group = FALSE, colour = commissioning_date))
+
+
+
+## does turbine size relate to capacity?
+
+wind_turbine2 %>%
+  ggplot() +
+  geom_point(aes( rotor_diameter_m, hub_height_m, colour = turbine_rated_capacity_k_w)) +
+  theme_bw() +
+  scale_colour_continuous("Turbine capacity (Kw)") +
+  labs( x = "Rotor diameter (m)", 
+        y = "Hub height (m)", 
+        title = "Relationship between rotor diamter and hub height of wind turbines",
+        subtitle = "Shaded by turbine capacity (Kw)"
+        )
+
+wind_turbine2 %>%
+  ggplot(aes(rotor_diameter_m, turbine_rated_capacity_k_w)) +
+  geom_point() +
+  geom_smooth()
+
+wind_turbine2 %>%
+  ggplot(aes(hub_height_m, turbine_rated_capacity_k_w)) +
+  geom_point() +
+  geom_smooth()
+
+wind_turbine2 %>%
+  ggplot(aes(hub_height_m, rotor_diameter_m)) +
+  geom_point() +
+  geom_smooth()
+
+##models
+
+wt2 <- as.data.frame(wind_turbine2, header = TRUE)
+wt2 <- wt2 %>% drop_na(hub_height_m, turbine_rated_capacity_k_w)
+
+mod1 <- lm(turbine_rated_capacity_k_w ~ hub_height_m, data = wt2) 
+
+summary(mod1)
+plot(mod1)
+
+wt2$pred <- predict(mod1)
+wt2$res <- residuals(mod1)
+  
+ggplot(wt2, aes(hub_height_m, turbine_rated_capacity_k_w)) +
+  geom_smooth(method = "lm", se = FALSE, colour = "grey") +
+  geom_point(aes(color = res)) +  # Color mapped here
+  scale_color_gradient2(low = "blue", mid = "white", high = "red") +  # Colors to use here
+  guides(color = FALSE) +
+  geom_point(aes(y = pred), shape = 1) +
+  geom_segment(aes(xend = hub_height_m, yend = pred), alpha = .25) +
+  theme_bw()
+  
+### hub height vs rotor diam
+
+wt2 <- as.data.frame(wind_turbine2, header = TRUE)
+wt2 <- wt2 %>% drop_na(hub_height_m, rotor_diameter_m)
+
+mod2 <- lm(rotor_diameter_m ~ hub_height_m, data = wt2) 
+
+summary(mod1)
+plot(mod1)
+
+wt2$pred2 <- predict(mod2)
+wt2$res2 <- residuals(mod2)
+
+ggplot(wt2, aes(hub_height_m, rotor_diameter_m)) +
+  geom_smooth(method = "lm", se = FALSE, colour = "grey") +
+  geom_point(aes(color = res2)) +  # Color mapped here
+  scale_color_gradient2(low = "blue", mid = "white", high = "red") +  # Colors to use here
+  guides(color = FALSE) +
+  geom_point(aes(y = pred2), shape = 1) +
+  geom_segment(aes(xend = hub_height_m, yend = pred2), alpha = .25) +
+  theme_bw()
