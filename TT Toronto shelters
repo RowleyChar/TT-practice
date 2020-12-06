@@ -1,0 +1,136 @@
+
+## Load data
+```{r}
+library(tidyverse)
+library(tidytuesdayR)
+library(lubridate)
+
+tuesdata <- tidytuesdayR::tt_load('2020-12-01')
+shelters <- tuesdata$shelters
+view(shelters)
+```
+
+## Explore data
+```{r}
+shelters
+
+shelters %>% 
+  count(occupancy_date)
+
+shelters %>% 
+  arrange(desc(occupancy_date))
+
+shelters %>% 
+  group_by(shelter_city,shelter_address) %>%
+  count(shelter_address)
+
+
+```
+
+## Plot occupancy over time
+```{r}
+shelters %>% 
+  group_by(occupancy_date, shelter_city) %>%
+  summarise(city_occupancy = sum(occupancy, na.rm = TRUE)) %>%
+  ggplot(aes(occupancy_date, log(city_occupancy), colour = shelter_city)) +
+  geom_line()
+```
+
+```{r}
+cities <- shelters %>% 
+  filter(shelter_city == "Toronto") %>%
+  group_by(occupancy_date) %>%
+  summarise(city_occupancy = sum(occupancy, na.rm = TRUE)) 
+view(cities)
+
+shelter_count <- cities %>% 
+  group_by(occupancy_date) %>%
+  summarise(shelter_count = n_distinct(facility_name))%>%
+  ggplot(aes(occupancy_date, shelter_count)) +
+  geom_line()
+
+## Different number of facilities reporting on certain dates - reason for large fluctuations in occupency in 2017 - express monthly/weekly instead
+
+```
+
+```{r}
+shelters %>% 
+  mutate(year = format(occupancy_date, "%Y"), year_mon = format(occupancy_date, "%Y-%m")) %>%
+  group_by(year, year_mon) %>%
+  summarise(total = sum(occupancy)) %>%
+  ggplot(aes(year_mon, total)) +
+  geom_line(aes(group=1)) +
+  theme(axis.text.x = element_text(angle = 90))
+  
+shelters %>% 
+  mutate(year = format(occupancy_date, "%Y"), year_mon = format(occupancy_date, "%Y-%m")) %>%
+  group_by(year, year_mon, shelter_city) %>%
+  summarise(total = sum(occupancy)) %>%
+  ggplot(aes(year_mon, log(total), colour = shelter_city, group = shelter_city)) +
+  geom_line() +
+  theme(axis.text.x = element_text(angle = 90))
+
+## broken down by city removes influence of Toronto numbers
+
+shelters %>% 
+  filter(shelter_city == "Scarborough") %>%
+  mutate(year = format(occupancy_date, "%Y"), year_mon = format(occupancy_date, "%Y-%m")) %>%
+  group_by(year, year_mon) %>%
+  summarise(shelter_count = n_distinct(facility_name)) %>%
+  ggplot(aes(year_mon, shelter_count)) +
+  geom_line(group=1) +
+  theme(axis.text.x = element_text(angle = 90))
+
+# 3 additional shelters in 2019```
+
+
+```
+
+```{r}
+shelters %>% 
+  filter(shelter_city == "Toronto") %>%
+  mutate(year = format(occupancy_date, "%Y"), year_mon = format(occupancy_date, "%Y-%m")) %>%
+  group_by(year, year_mon, sector) %>%
+  summarise(total = sum(occupancy)) %>%
+  ggplot(aes(year_mon, log(total), colour = sector, group = sector)) +
+  geom_line() +
+  theme(axis.text.x = element_text(angle = 90))
+
+shelters %>% 
+  filter(shelter_city == "Toronto") %>%
+  mutate(year = format(occupancy_date, "%Y"), year_mon = format(occupancy_date, "%Y-%m")) %>%
+  group_by(year, year_mon) %>%
+  summarise(shelter_count = n_distinct(facility_name)) %>%
+  ggplot(aes(year_mon, shelter_count)) +
+  geom_line(group=1) +
+  theme(axis.text.x = element_text(angle = 90))
+
+## spike of additional shelter names in 2019-03 only
+## identify the additional shelter names
+
+shelters_2019_03 <- shelters %>% 
+  filter(shelter_city == "Toronto") %>%
+  mutate(year = format(occupancy_date, "%Y"), year_mon = format(occupancy_date, "%Y-%m")) %>%
+  filter(year_mon == "2019-03") %>%
+  summarise(facility_name = unique(facility_name))
+
+shelters_2019_02 <- shelters %>% 
+  filter(shelter_city == "Toronto") %>%
+  mutate(year = format(occupancy_date, "%Y"), year_mon = format(occupancy_date, "%Y-%m")) %>%
+  filter(year_mon == "2019-02") %>%
+  summarise(facility_name = unique(facility_name))
+
+
+difference <- setdiff(shelters_2019_03, shelters_2019_02)
+difference <- as.list(difference)
+
+## filter out shelter names present in 2019-03 but not 2019-02
+
+shelters %>% 
+  filter(shelter_city == "Toronto", !(facility_name %in% difference[["facility_name"]])) %>%
+  mutate(year = format(occupancy_date, "%Y"), year_mon = format(occupancy_date, "%Y-%m")) %>%
+  group_by(year, year_mon) %>%
+  summarise(shelter_count = n_distinct(facility_name)) %>%
+  ggplot(aes(year_mon, shelter_count)) +
+  geom_line(group=1) +
+  theme(axis.text.x = element_text(angle = 90))
