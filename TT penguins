@@ -9,15 +9,17 @@ data <- data %>%
   drop_na() 
 
 by_species <-data %>%
-  group_by(species)
+  group_by(species, sex)
 
 summarise(by_species, mean_mass = mean(body_mass_g), max_mass = max(body_mass_g))
 mean(data$body_mass_g)
 
+
 poly <- data.frame(x = c( 0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5, 0),
-                   y = c(4207, 3706, 4775, 3733, 4800, 5092, 6300, 5092, 4207, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500, 2500))
+                   y = c(4207, 3900, 4775, 4150, 4800, 5253, 6300, 5092, 4207, 2300, 2300, 2300, 2300, 2300, 2300, 2300, 2300, 2300))
+                   
 data$species <- as.factor(data$species)
-data$species <- as.numeric(data$species)
+data$species <- as.numeric(data$species)                   
 
 ggplot() +
   geom_polygon(poly, mapping = aes(x = x, y = y), fill = "powderblue", alpha = 0.8) +
