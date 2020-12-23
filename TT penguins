@@ -36,6 +36,29 @@ ggplot() +
         axis.ticks.x = element_blank())
 
 
+data$species <- as.character(data$species)
+
+penguin_plot <- function(x, y, ylab) {
+  ggplot() +
+    geom_jitter(data, mapping = aes(x, y, colour = sex), width = .1, height = .1) +
+    scale_colour_manual(labels = c("Female", "Male"), values = c("white", "black")) +
+    scale_x_discrete(name = "Species", labels = c("Adelie", "Gentoo", "Chinstrap")) +
+    labs( y = ylab) +
+    theme(panel.background = element_rect(fill = "powderblue"),
+          panel.grid = element_blank(),
+          legend.key = element_rect(fill = "powderblue"),
+          axis.title = element_text(family = "sans"),
+          legend.title = element_blank(),
+          axis.text = element_text(colour = "turquoise4"),
+          axis.ticks.x = element_blank())
+}
+
+penguin_plot(x = data$species, y = data$bill_length_mm, ylab = "Bill length (mm)")
+
+penguin_plot(x = data$species, y = data$bill_depth_mm , ylab = "Bill depth (mm)")
+
+penguin_plot(x = data$species, y = data$flipper_length_mm , ylab = "Flipper length (mm)")
+
 
 
   
