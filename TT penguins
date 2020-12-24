@@ -59,6 +59,27 @@ penguin_plot(x = data$species, y = data$bill_depth_mm , ylab = "Bill depth (mm)"
 
 penguin_plot(x = data$species, y = data$flipper_length_mm , ylab = "Flipper length (mm)")
 
+mod <- lm(data$bill_depth_mm ~ data$bill_length_mm + data$species)  
+summary(mod)  
+
+data2 <- data %>%
+  add_predictions(mod, "length_depth")
+
+view(data2)
+
+ggplot() +
+  geom_point(data, mapping = aes(x = bill_length_mm, y = bill_depth_mm, colour = species)) +
+  geom_line(data2, mapping = aes(x = bill_length_mm, y = length_depth, colour = species)) +
+  scale_colour_manual(values = c("white", "darkgrey", "black")) +
+  labs( y = "Bill depth (mm)", x = "Bill length (mm)") +
+  theme(panel.background = element_rect(fill = "powderblue"),
+        panel.grid = element_blank(),
+        legend.key = element_rect(fill = "powderblue"),
+        axis.title = element_text(family = "sans"),
+        legend.title = element_blank(),
+        axis.text = element_text(colour = "turquoise4"),
+        axis.ticks.x = element_blank())
+
 
 
   
