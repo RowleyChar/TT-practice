@@ -1,0 +1,140 @@
+---
+title: "TT Big Mac"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidytuesdayR)
+library(tidyverse)
+
+tuesdata <- tidytuesdayR::tt_load('2020-12-22')
+big_mac <- tuesdata$`big-mac`
+
+```
+
+```{r}
+big_mac %>% 
+  count(name)
+
+big_mac %>%
+  count(date) %>%
+   print(n=33)
+
+all_dates <- big_mac %>% 
+   filter(str_detect(big_mac$date, "2000") == TRUE) %>%
+   pull(iso_a3)
+
+big_mac <- big_mac %>%
+  subset(iso_a3 %in% all_dates)
+
+big_mac %>%
+  count(date) %>%
+   print(n=33)
+  
+```
+
+
+```{r}
+big_mac %>%
+filter(str_detect(big_mac$date, "2000") == TRUE) %>%
+  mutate(col_code = ifelse(usd_raw > 0, "over", "under")) %>%
+  mutate(Country = fct_reorder(name, usd_raw)) %>%
+  ggplot(aes(x = Country, y = usd_raw)) +
+geom_segment(aes(x = Country, xend = Country, y = 0, yend = usd_raw, colour = col_code)) +
+geom_point(aes(x = Country, y = usd_raw, colour = col_code, fill = col_code), size=2, alpha=0.5, shape=21, stroke=0.5) +
+  coord_flip() +
+  labs(y = "USD") +
+  scale_colour_manual(values = c("gold", "red")) +
+  scale_fill_manual(values = c("gold", "red")) +
+  theme(panel.background = element_rect(fill = "gray90"),
+        panel.grid = element_blank(), 
+        legend.key = element_rect(fill = "gray90"),
+        legend.background = element_rect(fill = "gray90"), 
+        plot.background = element_rect(fill = "gray90"),
+        panel.grid.major.y = element_line(colour = "white"),
+        legend.title = element_blank(),
+        axis.text = element_text(colour = "grey27", size = 8),
+        axis.ticks = element_blank())
+
+
+```
+
+```{r}
+big_mac %>%
+  mutate(col_code = ifelse(usd_raw > 0, "over", "under")) %>%
+  mutate(Country = fct_reorder(name, usd_raw)) %>%
+  ggplot(aes(x = Country, y = usd_raw)) +
+geom_point(aes(x = Country, y = usd_raw, colour = col_code, fill = col_code), size=2, alpha=0.5, shape=21, stroke=0.5) +
+  coord_flip() +
+  labs(y = "USD") +
+  scale_colour_manual(values = c("gold", "red")) +
+  scale_fill_manual(values = c("gold", "red")) +
+  theme(panel.background = element_rect(fill = "gray90"),
+        panel.grid = element_blank(), 
+        legend.key = element_rect(fill = "gray90"),
+        legend.background = element_rect(fill = "gray90"), 
+        plot.background = element_rect(fill = "gray90"),
+        panel.grid.major.y = element_line(colour = "white"),
+        legend.title = element_blank(),
+        axis.text = element_text(colour = "grey27", size = 8),
+        axis.ticks = element_blank())
+
+```
+
+```{r}
+big_mac %>%
+  filter(name != "United States") %>%
+  drop_na(usd_adjusted) %>%
+  mutate(col_code = ifelse(usd_adjusted > 0, "over", "under")) %>%
+  mutate(Country = fct_reorder(name, usd_adjusted)) %>%
+  ggplot(aes(x = Country, y = usd_adjusted)) +
+geom_point(aes(x = Country, y = usd_adjusted, colour = col_code, fill = col_code), size=2, alpha=0.5, shape=21, stroke=0.5) +
+  coord_flip() +
+  labs(y = "USD") +
+  scale_colour_manual(values = c("gold", "red")) +
+  scale_fill_manual(values = c("gold", "red")) +
+  theme(panel.background = element_rect(fill = "gray90"),
+        panel.grid = element_blank(), 
+        legend.key = element_rect(fill = "gray90"),
+        legend.background = element_rect(fill = "gray90"), 
+        plot.background = element_rect(fill = "gray90"),
+        panel.grid.major.y = element_line(colour = "white"),
+        legend.title = element_blank(),
+        axis.text = element_text(colour = "grey27", size = 8),
+        axis.ticks = element_blank())
+```
+
+```{r}
+library(lubridate)
+library(gganimate)
+library(png)
+library(gifski)
+```
+
+```{r}
+with_year <- big_mac %>%
+ drop_na(gdp_dollar) %>%
+  mutate(yr = year(date))
+
+with_year$yr <-as.character(with_year$yr)
+
+
+```
+
+```{r}
+p <- ggplot(with_year) +
+geom_point(aes(x = gdp_dollar, y = dollar_price))
+```
+
+```{r}
+anim <- p +
+  transition_states(yr)
+
+anim + ggtitle('Now showing {closest_state}',
+          subtitle = 'Frame {frame} of {nframes}')
+```
+
