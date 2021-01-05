@@ -1,0 +1,122 @@
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+library(lubridate)
+
+
+theme_set(theme_light())
+
+tuesdata <- tidytuesdayR::tt_load('2020-09-22')
+peaks <- tuesdata$peaks
+exped <- tuesdata$expeditions
+members <- tuesdata$members
+
+peak_names <- peaks %>%
+  select(peak_id, peak_name)
+
+peaks$first_ascent_year <- as.numeric(peaks$first_ascent_year)
+
+
+
+## barplot of peak name vs height and climbing status - reorder peak names by height
+
+peaks %>%
+  arrange(desc(height_metres)) %>%
+  ggplot(aes(x = reorder(peak_name, -height_metres), y = height_metres, fill = climbing_status)) +
+  geom_bar(stat = "identity") +
+  labs( y = "Height (m)",
+        x = "Peaks") +
+  scale_fill_discrete(name = "Climbing status") +
+  theme(axis.text.x = element_blank())
+    
+## scatterplot of first asecnt year by height & country 
+
+peaks %>%
+  drop_na(c(first_ascent_year, first_ascent_country)) %>%
+  ggplot(aes(x = first_ascent_year, y = height_metres, colour = first_ascent_country)) +
+  geom_point() +
+  labs( y = "Height (m)",
+        x = "First ascent year") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90))
+
+## change erroneous value
+peaks <- peaks %>%
+  arrange(first_ascent_year) %>%
+  mutate (first_ascent_year = replace(first_ascent_year, first_ascent_year == 201,"2018"))
+
+## checkfreq of first ascent by country
+peaks %>%
+  group_by(first_ascent_country) %>%
+  summarise(n = length(first_ascent_country)) %>%
+  arrange(desc(n))
+
+##select top 10 and show activity over time
+
+top_countries <- peaks %>%
+  drop_na(first_ascent_country) %>%
+  group_by(first_ascent_country) %>%
+  summarise(n = length(first_ascent_country)) %>%
+  arrange(desc(n)) %>%
+  slice_max(n, n = 10)
+
+peaks %>% 
+  filter(first_ascent_country %in% c(top_countries$first_ascent_country)) %>%
+  group_by(first_ascent_year, first_ascent_country) %>%
+  summarise(n = length(first_ascent_country)) %>%
+  ggplot(aes(first_ascent_year, n)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ first_ascent_country) +
+  theme(axis.text.x = element_text(angle = 90))
+  
+## Expeditions
+## add coloumn for success/failure
+
+exped <- exped %>%
+  mutate(success = ifelse(termination_reason %in% c("Success (main peak)","Success (subpeak)"), "Yes", "No"))
+  
+exped %>% 
+  ggplot(aes(success)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 90))
+
+exped %>% count(termination_reason) %>%
+  ggplot(aes(reorder(termination_reason, n), n)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme(axis.text.x = element_text(angle = 90))
+
+prop_success <- exped %>% group_by(peak_id) %>%
+   summarise(prop_yes = mean(success == "Yes"),
+             n_yes = sum(success == "Yes"),
+             n_no = sum(success == "No"),
+             count = n())
+
+prop_success %>%
+  filter(count > 10) %>%
+  ggplot() +
+  geom_point(aes(reorder(peak_id, -count), log(n_no)), colour = "red", alpha = 0.5) +
+  geom_point(aes(reorder(peak_id, -count), log(n_yes)), colour = "green", alpha = 0.5) +
+  theme(axis.text.x = element_text(angle = 90))
+
+exped %>% group_by(peak_id) %>%
+  filter(n() > 20) %>%
+  ggplot(aes(peak_id, success, fill = success)) +
+  geom_bar(position = "stack", stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90))
+
+
+exped %>%
+  group_by(peak_id) %>%
+  filter(n() > 20) %>%
+  ggplot(aes(peak_id, year, colour = success)) +
+  geom_point() +
+  coord_flip()
+
+exped %>%
+  group_by(peak_id) %>%
+  filter(n() > 20) %>%
+  count(peak_id, success) %>%
+  ggplot(aes(reorder(peak_id, n, sum), n, fill = success)) +
+  geom_col() +
+  coord_flip()
