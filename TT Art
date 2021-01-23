@@ -1,0 +1,150 @@
+library(tidytuesdayR)
+library(tidyverse)
+library(stringr)
+library(tidytext)
+theme_set(theme_bw())
+
+tuesdata <- tidytuesdayR::tt_load('2021-01-12')
+artwork <- tuesdata$artwork
+artists <- tuesdata$artists
+
+art <- artwork %>% 
+    rename(name = artist) %>%
+    inner_join(artists, by = "name")
+
+art %>% drop_na(year, gender) %>%
+  group_by(year, gender) %>%
+  tally() %>%
+  ggplot(aes(year, n, colour = gender)) +
+  geom_point()
+
+
+art %>% drop_na(year, name) %>%
+  group_by(year, name) %>%
+  filter(name == "Turner, Joseph Mallord William") %>%
+  tally() %>%
+  ggplot(aes(year, n)) +
+  geom_point()
+
+## gender split by year removing the influence of Turner
+
+art %>% drop_na(year, gender) %>%
+  filter(name != "Turner, Joseph Mallord William") %>%
+  group_by(year, gender) %>%
+  tally() %>%
+  ggplot(aes(year, n, colour = gender)) +
+  geom_point()
+
+## type of paint used
+
+art <- art %>% mutate(
+                  oil = str_detect(medium, "Oil"), 
+                  acrylic = str_detect(medium, "Acrylic"),
+                  watercolour = str_detect(medium, "Watercolour"))
+
+
+art$paint <- apply(art[,29:31], 1, function(x) toString(names(art[,29:31])[x]))
+
+art %>% group_by(paint) %>%
+  drop_na(paint) %>%
+  tally()
+  
+
+art %>%
+  filter(paint != "NA, NA, NA") %>%
+  filter(paint != "") %>%
+  filter(name != "Turner, Joseph Mallord William") %>%
+  group_by(year) %>%
+  count(paint) %>%
+  ggplot() +
+  geom_point(aes(year, n, colour = paint)) +
+  ylim(0, 75)
+
+## Just Turner
+
+art %>% filter(name == "Turner, Joseph Mallord William", year < 1851) %>%
+  group_by(year) %>%
+  tally() %>%
+  filter(year != "1680") %>%
+  ggplot(aes(year, n)) +
+  geom_bar(stat = "identity")
+
+
+## Texy analysis - see text mining book for details
+
+art_words <- art %>% unnest_tokens(word, title)
+paint_words <- art %>% unnest_tokens(word, medium)
+
+## most common media
+paint_words %>%
+  count(gender, word, sort = TRUE) %>%
+  print(n = 50)
+
+plot_data <- paint_words %>%
+  drop_na(word, gender) %>%
+  count(word, gender,  sort = TRUE) %>%
+  filter(n >200, word != "on", word != "and") %>%
+  mutate(word = reorder(word, n)) %>%
+  group_by(gender) %>%
+  top_n(n = 12) %>%
+  ungroup() %>%
+  arrange(gender, n) %>%
+  mutate(order = row_number())
+  
+ggplot(plot_data, aes(order, n, fill = gender)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+  facet_wrap(~ gender, scales = "free") +
+  xlab("Media") +
+  ylab("Frequency") +
+  scale_x_continuous(
+    breaks = plot_data$order,
+    labels = plot_data$word,
+    expand = c(0,0)
+  ) +
+  coord_flip()
+
+## Do the most important words in titles differ by gender?
+gender_words <- art_words %>%
+  count(gender, word, sort = TRUE) %>%
+  drop_na(gender) %>%
+  mutate(total = sum(n))
+
+ggplot(gender_words, aes(n/total, fill = gender)) +
+  geom_histogram(show.legend = FALSE) +
+  xlim(NA, 0.0004) +
+  facet_wrap(~gender, scales = "free_y")
+
+freq_by_rank <- gender_words %>% 
+  group_by(gender) %>% 
+  mutate(rank = row_number(), 
+         `term frequency` = n/total) %>%
+  ungroup()
+
+freq_by_rank %>% 
+  ggplot(aes(rank, `term frequency`, color = gender)) + 
+  geom_line(size = 1.1, alpha = 0.8, show.legend = FALSE) + 
+  scale_x_log10() +
+  scale_y_log10()
+
+data_subset <- freq_by_rank %>% 
+    filter(gender == "Female")
+
+lm(log10(`term frequency`) ~ log10(rank), data = data_subset)
+
+art_tf_idf <- gender_words %>%
+  bind_tf_idf(word, gender, n)
+
+art_tf_idf %>%
+  select(-total) %>%
+  arrange(desc(tf_idf))
+
+library(forcats)
+
+art_tf_idf %>%
+  group_by(gender) %>%
+  slice_max(tf_idf, n = 15) %>%
+  ungroup() %>%
+  ggplot(aes(tf_idf, fct_reorder(word, tf_idf), fill = gender)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~gender, ncol = 2, scales = "free") +
+  labs(x = "tf-idf", y = NULL)
